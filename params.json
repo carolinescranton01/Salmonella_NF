@@ -1,0 +1,16 @@
+{
+  "reads": {
+    "type": "string",
+    "default": "*_{R1,R2}_001.fastq.gz"
+  },
+  "bakta_db": {
+    "type": "string"
+  },
+  "checkm_db": {
+    "type": "string"
+  },
+  "outdir": {
+    "type": "string",
+    "default": "results"
+  }
+}
