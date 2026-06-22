@@ -115,9 +115,10 @@ spades.py \
     -2 ${r2} \
     -t ${task.cpus} \
     -m 60 \
-    -o spades
+    -o spades_${sample} \
+    --cov-cutoff auto
 
-cp spades/scaffolds.fasta ${sample}.fasta
+cp spades_${sample}/scaffolds.fasta ${sample}.fasta
 """
 ```
 
@@ -174,12 +175,12 @@ path("${sample}_checkm2")
 
 script:
 """
-mkdir genomes
-cp ${fasta} genomes/
+mkdir genomes_${sample}
+cp ${fasta} genomes_${sample}/
 
 checkm2 predict \
     --threads ${task.cpus} \
-    --input genomes \
+    --input genomes_${sample} \
     --output-directory ${sample}_checkm2 \
     --database_path ${params.checkm_db}
 """
@@ -267,8 +268,7 @@ input:
 path(gffs)
 
 output:
-path("core_gene_alignment.aln")
-path("gene_presence_absence.csv")
+path "core_gene_alignment.aln", emit: aln
 
 script:
 """
@@ -327,7 +327,8 @@ workflow {
 ```
 trimmed = FASTP(reads_ch)
 
-FASTQC(trimmed)
+fastqc_ch = trimmed.map { it }
+FASTQC(fastqc_ch)
 
 assemblies = SPADES(trimmed)
 
@@ -339,11 +340,11 @@ SISTR(assemblies)
 
 annotations = BAKTA(assemblies)
 
-gff_files = annotations.map { sample, gff -> gff }.collect()
+gff_files = annotations.map { sample, gff -> gff }
 
-panaroo = PANAROO(gff_files)
+PANAROO(gff_files.collect())
 
-RAXML(panaroo.out[0])
+RAXML(panaroo.out.aln)
 ```
 
 }
