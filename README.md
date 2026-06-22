@@ -1,2 +1,3 @@
 # Salmonella_NF
-nextflow pipeline for APGAP Salmonella analysis
+Nextflow pipeline for APGAP Salmonella analysis - Cooper Lab
+
