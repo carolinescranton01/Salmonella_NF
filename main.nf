@@ -16,48 +16,25 @@ params.outdir = "results"
 
 workflow {
 
-    /*
-     * INPUT CHANNEL (clean + explicit)
-     */
-    Channel
-        .fromFilePairs(params.reads, checkIfExists: true)
-        .set { read_pairs_ch }
+    reads_ch = Channel.fromFilePairs(params.reads, checkIfExists: true)
 
-    /*
-     * QC + TRIMMING
-     */
-    trimmed_ch = FASTP(read_pairs_ch)
+    trimmed_ch = FASTP(reads_ch)
 
     FASTQC(trimmed_ch)
 
-    /*
-     * ASSEMBLY
-     */
     assemblies_ch = SPADES(trimmed_ch)
 
-    /*
-     * PER-SAMPLE ANALYSIS
-     */
     QUAST(assemblies_ch)
+
     CHECKM2(assemblies_ch)
+
     SISTR(assemblies_ch)
 
-    /*
-     * ANNOTATION
-     */
-    bakta_ch = BAKTA(assemblies_ch)
+    annotations_ch = BAKTA(assemblies_ch)
 
-    /*
-     * PAN-GENOME STEP (SAFE AGGREGATION)
-     */
-    gff_ch = bakta_ch
-        .map { sample, gff -> gff }
-        .collect()
+    gff_ch = annotations_ch.map { sample, gff -> gff }
 
-    panaroo_out = PANAROO(gff_ch)
+    PANAROO(gff_ch.collect())
 
-    /*
-     * PHYLOGENY
-     */
-    RAXML(panaroo_out.aln)
+    RAXML(PANAROO.out.aln)
 }
