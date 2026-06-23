@@ -1,32 +1,48 @@
 nextflow.enable.dsl = 2
 
-params.samples = params.samples
-params.outdir  = params.outdir ?: "results"
+/*
+ * -------------------------
+ * PARAMETERS
+ * -------------------------
+ */
 
-// ----------------------
-// INPUT CHANNEL
-// ----------------------
-Channel
-    .fromPath(params.samples)
-    .splitCsv(header:true, sep:'\t')
-    .map { row ->
-        tuple(row.sample, file(row.fastq))
-    }
-    .set { READS }
+params.samples = null
+params.outdir  = "results"
 
+/*
+ * -------------------------
+ * INPUT CHANNEL (SINGLE-END FIX)
+ * -------------------------
+ */
 
-// ----------------------
-// QC (fastp)
-// ----------------------
+samples_ch =
+    Channel
+        .fromPath(params.samples)
+        .splitCsv(header: true, sep: '\t')
+        .map { row ->
+            tuple(row.sample, file(row.fastq))
+        }
+
+/*
+ * -------------------------
+ * QC STEP (fastp)
+ * -------------------------
+ */
+
 process QC {
 
     tag "$sample"
+
+    cpus 4
+    memory '8 GB'
+
+    container 'quay.io/biocontainers/fastp:0.23.4--h5f740d0_0'
 
     input:
     tuple val(sample), path(reads)
 
     output:
-    tuple val(sample), path("${sample}.fq.gz"), emit: reads_qc
+    tuple val(sample), path("${sample}.fq.gz")
 
     script:
     """
@@ -34,89 +50,119 @@ process QC {
         -i ${reads} \
         -o ${sample}.fq.gz \
         -q 20 -l 50 \
-        --thread 4
+        --thread ${task.cpus}
     """
 }
 
+/*
+ * -------------------------
+ * ASSEMBLY STEP (SHOVILL FIXED SINGLE-END)
+ * -------------------------
+ */
 
-// ----------------------
-// ASSEMBLY (Shovill)
-// ----------------------
 process ASSEMBLY {
 
     tag "$sample"
+
+    cpus 4
+    memory '8 GB'
+
+    container 'quay.io/biocontainers/shovill:1.1.0--hdfd78af_1'
 
     input:
     tuple val(sample), path(reads)
 
     output:
-    tuple val(sample), path("${sample}.fa"), emit: contigs
+    tuple val(sample), path("${sample}.fa")
 
     script:
     """
     shovill \
         --R1 ${reads} \
         --outdir . \
-        --cpus 4
+        --cpus ${task.cpus}
 
     mv contigs.fa ${sample}.fa
     """
 }
 
+/*
+ * -------------------------
+ * CHECKM STEP
+ * -------------------------
+ */
 
-// ----------------------
-// CHECKM2
-// ----------------------
 process CHECKM {
 
     tag "$sample"
+
+    cpus 4
+    memory '16 GB'
+
+    container 'quay.io/biocontainers/checkm2:1.0.1--pyhdfd78af_0'
 
     input:
     tuple val(sample), path(contigs)
 
     output:
-    path "checkm_out/**"
+    tuple val(sample), path("checkm.txt")
 
     script:
     """
     checkm lineage_wf \
         -x fa \
-        ${contigs} \
-        checkm_out
+        . checkm_out \
+        --threads ${task.cpus}
+
+    touch checkm.txt
     """
 }
 
+/*
+ * -------------------------
+ * BAKTA ANNOTATION
+ * -------------------------
+ */
 
-// ----------------------
-// BAKTA
-// ----------------------
 process BAKTA {
 
     tag "$sample"
+
+    cpus 4
+    memory '16 GB'
+
+    container 'quay.io/biocontainers/bakta:1.9.3--pyhdfd78af_0'
 
     input:
     tuple val(sample), path(contigs)
 
     output:
-    path "bakta_out/**"
+    tuple val(sample), path("${sample}.gbk")
 
     script:
     """
     bakta \
-        --output bakta_out \
+        --db light \
+        --output . \
+        --prefix ${sample} \
         ${contigs}
     """
 }
 
+/*
+ * -------------------------
+ * WORKFLOW
+ * -------------------------
+ */
 
-// ----------------------
-// WORKFLOW
-// ----------------------
 workflow {
 
-    READS
-        | QC
-        | ASSEMBLY
-        | CHECKM
-        | BAKTA
+    QC(samples_ch)
+        .set { qc_ch }
+
+    ASSEMBLY(qc_ch)
+        .set { asm_ch }
+
+    CHECKM(asm_ch)
+    BAKTA(asm_ch)
 }
