@@ -191,7 +191,7 @@ process SISTR {
 
     sistr \
         --input ${assembly} \
-        --output ${sample}_sistr/${sample} \
+        --output Sample1_sistr \
         --qc \
         --alleles-output ${sample}_sistr/${sample}_alleles.json
     """
