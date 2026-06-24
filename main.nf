@@ -104,24 +104,26 @@ process CHECKM {
     tag "$sample"
 
     cpus 4
-    memory '16 GB'
+    memory '8 GB'
 
-    container 'quay.io/biocontainers/checkm2:1.0.1--pyhdfd78af_0'
+    container 'quay.io/biocontainers/checkm-genome:1.2.2--pyhdfd78af_0'
 
     input:
-    tuple val(sample), path(contigs)
+    tuple val(sample), path(assembly)
 
     output:
-    tuple val(sample), path("checkm.txt")
+    path("checkm_out")
 
     script:
     """
+    mkdir genomes
+    cp ${assembly} genomes/
+
     checkm lineage_wf \
         -x fa \
-        . checkm_out \
+        genomes \
+        checkm_out \
         --threads ${task.cpus}
-
-    touch checkm.txt
     """
 }
 
@@ -158,6 +160,39 @@ process BAKTA {
 
 /*
  * -------------------------
+ * SISTR ANNOTATION
+ * -------------------------
+ */
+
+process SISTR {
+
+    tag "$sample"
+
+    cpus 4
+    memory '8 GB'
+
+    container 'quay.io/biocontainers/sistr_cmd:1.1.1--pyhdfd78af_0'
+
+    input:
+    tuple val(sample), path(assembly)
+
+    output:
+    path("${sample}_sistr")
+
+    script:
+    """
+    mkdir ${sample}_sistr
+
+    sistr \
+        --input ${assembly} \
+        --output ${sample}_sistr/${sample}.csv \
+        --qc \
+        --alleles-output ${sample}_sistr/${sample}_alleles.json
+    """
+}
+
+/*
+ * -------------------------
  * WORKFLOW
  * -------------------------
  */
@@ -172,4 +207,5 @@ workflow {
 
     CHECKM(asm_ch)
     BAKTA(asm_ch)
+    SISTR(asm_ch)
 }
