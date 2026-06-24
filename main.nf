@@ -40,7 +40,7 @@ process QC {
     cpus 4
     memory '8 GB'
 
-    container 'quay.io/biocontainers/fastp:0.23.4--h5f740d0_0'
+    container 'quay.io/biocontainers/checkm-genome:1.2.2--pyhdfd78af_0'
 
     input:
     tuple val(sample), path(read1), path(read2)
