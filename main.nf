@@ -170,7 +170,7 @@ process SISTR {
     cpus 2
     memory '4 GB'
 
-    container 'quay.io/biocontainers/sistr_cmd:1.1.1--pyhdfd78af_0'
+    container 'staphb/sistr_cmd:latest'
 
     input:
     tuple val(sample), path(assembly)
@@ -191,7 +191,7 @@ process SISTR {
 
     sistr \
         --input ${assembly} \
-        --output ${sample}_sistr/${sample}.csv \
+        --output ${sample}_sistr/${sample} \
         --qc \
         --alleles-output ${sample}_sistr/${sample}_alleles.json
     """
