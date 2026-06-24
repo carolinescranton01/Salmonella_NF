@@ -120,7 +120,6 @@ process CHECKM {
     cp ${assembly} genomes/
 
     checkm2 predict \
-        -x fa \
         -i genomes \
         -o checkm_out \
         --threads ${task.cpus}
