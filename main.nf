@@ -168,8 +168,8 @@ process SISTR {
 
     tag "$sample"
 
-    cpus 4
-    memory '8 GB'
+    cpus 2
+    memory '4 GB'
 
     container 'quay.io/biocontainers/sistr_cmd:1.1.1--pyhdfd78af_0'
 
@@ -181,6 +181,13 @@ process SISTR {
 
     script:
     """
+    set -e
+
+    echo "Checking assembly:"
+    ls -lh ${assembly}
+    head -n 5 ${assembly}
+
+    rm -rf ${sample}_sistr
     mkdir ${sample}_sistr
 
     sistr \
