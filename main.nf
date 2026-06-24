@@ -106,7 +106,7 @@ process CHECKM {
     cpus 4
     memory '8 GB'
 
-    container 'quay.io/biocontainers/checkm-genome:1.2.2--pyhdfd78af_0'
+    container 'staphb/checkm2:latest'
 
     input:
     tuple val(sample), path(assembly)
