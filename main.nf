@@ -117,9 +117,16 @@ process CHECKM2 {
 
     script:
     """
+    mkdir -p checkm2_db
+
+    checkm2 database \
+        --download \
+        --path checkm2_db
+
     checkm2 predict \
         -i ${fasta} \
         -o checkm2_out \
+        --database_path checkm2_db/CheckM2_database \
         -t ${task.cpus}
     """
 }
