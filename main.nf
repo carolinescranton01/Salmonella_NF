@@ -119,10 +119,10 @@ process CHECKM {
     mkdir genomes
     cp ${assembly} genomes/
 
-    checkm lineage_wf \
+    checkm2 predict \
         -x fa \
-        genomes \
-        checkm_out \
+        -i genomes \
+        -o checkm_out \
         --threads ${task.cpus}
     """
 }
