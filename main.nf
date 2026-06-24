@@ -20,7 +20,11 @@ samples_ch =
         .fromPath(params.samples)
         .splitCsv(header: true, sep: '\t')
         .map { row ->
-            tuple(row.sample, file(row.fastq))
+            tuple(
+                row.sample,
+                file(row.fastq_1),
+                file(row.fastq_2)
+            )
         }
 
 /*
@@ -39,16 +43,18 @@ process QC {
     container 'quay.io/biocontainers/fastp:0.23.4--h5f740d0_0'
 
     input:
-    tuple val(sample), path(reads)
+    tuple val(sample), path(read1), path(read2)
 
     output:
-    tuple val(sample), path("${sample}.fq.gz")
+    tuple val(sample), path("${sample}_R1.fq.gz"), path("${sample}_R2.fq.gz")
 
     script:
     """
     fastp \
-        -i ${reads} \
-        -o ${sample}.fq.gz \
+        -i ${read1} \
+        -I ${read2} \
+        -o ${sample}_R1.fq.gz \
+        -O ${sample}_R2.fq.gz \
         -q 20 -l 50 \
         --thread ${task.cpus}
     """
@@ -70,7 +76,7 @@ process ASSEMBLY {
     container 'quay.io/biocontainers/shovill:1.1.0--hdfd78af_1'
 
     input:
-    tuple val(sample), path(reads)
+    tuple val(sample), path(read1), path(read2)
 
     output:
     tuple val(sample), path("${sample}.fa")
@@ -78,7 +84,8 @@ process ASSEMBLY {
     script:
     """
     shovill \
-        --R1 ${reads} \
+        --R1 ${read1} \
+        --R2 ${read2} \
         --outdir . \
         --cpus ${task.cpus}
 
