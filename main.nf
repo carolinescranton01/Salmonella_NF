@@ -1,4 +1,4 @@
-nextflow.enable.dsl = 2
+nextflow.enable.dsl=2
 
 /*
  * -------------------------
@@ -7,29 +7,28 @@ nextflow.enable.dsl = 2
  */
 
 params.samples = null
-params.outdir  = "results"
+params.outdir = "results"
 
 /*
  * -------------------------
- * INPUT CHANNEL (SINGLE-END FIX)
+ * INPUT CHANNEL
  * -------------------------
  */
 
-samples_ch =
-    Channel
-        .fromPath(params.samples)
-        .splitCsv(header: true, sep: '\t')
-        .map { row ->
-            tuple(
-                row.sample,
-                file(row.fastq_1),
-                file(row.fastq_2)
-            )
-        }
+Channel.fromPath(params.samples)
+    .splitCsv(header:true, sep:'\t')
+    .map { row ->
+        tuple(
+            row.sample,
+            file(row.fastq_1),
+            file(row.fastq_2)
+        )
+    }
+    .set { samples_ch }
 
 /*
  * -------------------------
- * QC STEP (fastp)
+ * QC (fastp)
  * -------------------------
  */
 
@@ -40,13 +39,15 @@ process QC {
     cpus 4
     memory '8 GB'
 
-    container 'quay.io/biocontainers/checkm-genome:1.2.2--pyhdfd78af_0'
+    container 'quay.io/biocontainers/fastp:0.23.4--h5f740d0_0'
 
     input:
     tuple val(sample), path(read1), path(read2)
 
     output:
-    tuple val(sample), path("${sample}_R1.fq.gz"), path("${sample}_R2.fq.gz")
+    tuple val(sample),
+          path("${sample}_R1.fq.gz"),
+          path("${sample}_R2.fq.gz")
 
     script:
     """
@@ -62,7 +63,7 @@ process QC {
 
 /*
  * -------------------------
- * ASSEMBLY STEP (SHOVILL FIXED SINGLE-END)
+ * ASSEMBLY (shovill)
  * -------------------------
  */
 
@@ -73,7 +74,7 @@ process ASSEMBLY {
     cpus 4
     memory '8 GB'
 
-    container 'quay.io/biocontainers/shovill:1.1.0--hdfd78af_1'
+    container 'staphb/shovill:1.1.0'
 
     input:
     tuple val(sample), path(read1), path(read2)
@@ -86,41 +87,46 @@ process ASSEMBLY {
     shovill \
         --R1 ${read1} \
         --R2 ${read2} \
-        --outdir shovill_out \
+        --outdir ${sample}_asm \
         --cpus ${task.cpus}
 
-    cp shovill_out/contigs.fa ${sample}.fa
+    cp ${sample}_asm/contigs.fa ${sample}.fa
     """
 }
 
 /*
  * -------------------------
- * CHECKM STEP
+ * CHECKM2
  * -------------------------
  */
 
-process CHECKM {
+process CHECKM2 {
 
-  container 'staphb/checkm2:latest'
+    tag "$sample"
 
-  input:
-  path fasta
+    cpus 4
+    memory '16 GB'
 
-  output:
-  path "checkm_out"
+    container 'staphb/checkm2:latest'
 
-  script:
-  """
-  checkm2 predict \
-    -i ${fasta} \
-    -o checkm_out \
-    -t 4
-  """
+    input:
+    tuple val(sample), path(fasta)
+
+    output:
+    tuple val(sample), path("checkm2_out")
+
+    script:
+    """
+    checkm2 predict \
+        -i ${fasta} \
+        -o checkm2_out \
+        -t ${task.cpus}
+    """
 }
 
 /*
  * -------------------------
- * BAKTA ANNOTATION
+ * BAKTA
  * -------------------------
  */
 
@@ -131,27 +137,27 @@ process BAKTA {
     cpus 4
     memory '16 GB'
 
-    container 'quay.io/biocontainers/bakta:1.9.3--pyhdfd78af_0'
+    container 'staphb/bakta:latest'
 
     input:
-    tuple val(sample), path(contigs)
+    tuple val(sample), path(fasta)
 
     output:
-    tuple val(sample), path("${sample}.gbk")
+    tuple val(sample), path("bakta_out")
 
     script:
     """
     bakta \
-        --db light \
-        --output . \
+        --input ${fasta} \
+        --output bakta_out \
         --prefix ${sample} \
-        ${contigs}
+        --threads ${task.cpus}
     """
 }
 
 /*
  * -------------------------
- * SISTR ANNOTATION
+ * SISTR
  * -------------------------
  */
 
@@ -165,27 +171,20 @@ process SISTR {
     container 'staphb/sistr_cmd:latest'
 
     input:
-    tuple val(sample), path(assembly)
+    tuple val(sample), path(fasta)
 
     output:
-    path("${sample}_sistr")
+    tuple val(sample), path("sistr_out")
 
     script:
     """
-    set -e
-
-    echo "Checking assembly:"
-    ls -lh ${assembly}
-    head -n 5 ${assembly}
-
-    rm -rf ${sample}_sistr
-    mkdir ${sample}_sistr
+    mkdir sistr_out
 
     sistr \
-        --input ${assembly} \
-        --output Sample1_sistr \
-        --qc \
-        --alleles-output ${sample}_sistr/${sample}_alleles.json
+        --input ${fasta} \
+        --output sistr_out/${sample}.tsv \
+        --alleles-output sistr_out/${sample}_alleles.json \
+        --qc
     """
 }
 
@@ -197,13 +196,11 @@ process SISTR {
 
 workflow {
 
-    QC(samples_ch)
-        .set { qc_ch }
+    qc_ch = QC(samples_ch)
 
-    ASSEMBLY(qc_ch)
-        .set { asm_ch }
+    asm_ch = ASSEMBLY(qc_ch)
 
-    CHECKM(asm_ch)
+    CHECKM2(asm_ch)
     BAKTA(asm_ch)
     SISTR(asm_ch)
 }
