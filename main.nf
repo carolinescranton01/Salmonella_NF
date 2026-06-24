@@ -101,29 +101,21 @@ process ASSEMBLY {
 
 process CHECKM {
 
-    tag "$sample"
+  container 'staphb/checkm2:latest'
 
-    cpus 4
-    memory '8 GB'
+  input:
+  path fasta
 
-    container 'ghcr.io/meb/checkm2:latest'
+  output:
+  path "checkm_out"
 
-    input:
-    tuple val(sample), path(assembly)
-
-    output:
-    path("checkm_out")
-
-    script:
-    """
-    mkdir genomes
-    cp ${assembly} genomes/
-
-    checkm2 predict \
-        -i genomes \
-        -o checkm_out \
-        -t ${task.cpus}
-    """
+  script:
+  """
+  checkm2 predict \
+    -i ${fasta} \
+    -o checkm_out \
+    -t 4
+  """
 }
 
 /*
