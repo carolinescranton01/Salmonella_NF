@@ -106,7 +106,7 @@ process CHECKM {
     cpus 4
     memory '8 GB'
 
-    container 'staphb/checkm2:latest'
+    container 'ghcr.io/meb/checkm2:latest'
 
     input:
     tuple val(sample), path(assembly)
@@ -122,7 +122,7 @@ process CHECKM {
     checkm2 predict \
         -i genomes \
         -o checkm_out \
-        --threads ${task.cpus}
+        -t ${task.cpus}
     """
 }
 
