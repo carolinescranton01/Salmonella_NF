@@ -86,10 +86,10 @@ process ASSEMBLY {
     shovill \
         --R1 ${read1} \
         --R2 ${read2} \
-        --outdir . \
+        --outdir shovill_out \
         --cpus ${task.cpus}
 
-    mv contigs.fa ${sample}.fa
+    cp shovill_out/contigs.fa ${sample}.fa
     """
 }
 
